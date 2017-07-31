@@ -37,11 +37,12 @@ class ParticleFilter {
 	
 	// Vector of weights of all particles
 	std::vector<double> weights;
-	
+
+  // Set of current particles
+  std::vector<Particle> particles;
+
 public:
-	
-	// Set of current particles
-	std::vector<Particle> particles;
+  const std::vector<Particle> getParticles() const { return particles;  }
 
 	// Constructor
 	// @param M Number of particles

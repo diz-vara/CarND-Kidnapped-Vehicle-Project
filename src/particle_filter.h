@@ -11,7 +11,12 @@
 
 #include "helper_functions.h"
 
-struct Particle {
+class Particle 
+{
+
+public:
+  Particle(int _id, double _x, double _y, double _theta);
+
 
 	int id;
 	double x;
@@ -41,12 +46,17 @@ class ParticleFilter {
   // Set of current particles
   std::vector<Particle> particles;
 
+  std::random_device rd;
+  std::mt19937 gen; 
+
+
 public:
   const std::vector<Particle> getParticles() const { return particles;  }
 
 	// Constructor
 	// @param M Number of particles
-	ParticleFilter() : num_particles(0), is_initialized(false) {}
+	ParticleFilter(int _n_particles=10) : num_particles(_n_particles), is_initialized(false), gen(std::mt19937(rd()))
+  {}
 
 	// Destructor
 	~ParticleFilter() {}

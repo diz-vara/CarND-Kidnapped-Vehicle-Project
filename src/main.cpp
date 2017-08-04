@@ -25,7 +25,7 @@ std::string hasData(std::string s) {
   return "";
 }
 
-int main()
+int main(int argc, const char** argv)
 {
   uWS::Hub h;
 
@@ -43,8 +43,12 @@ int main()
 	  return -1;
   }
 
+  //TODO: read command line and extract number of particles
+  int numParticles = 50;
+
+
   // Create particle filter
-  ParticleFilter pf;
+  ParticleFilter pf(numParticles);
 
   h.onMessage([&pf,&map,&delta_t,&sensor_range,&sigma_pos,&sigma_landmark](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -118,7 +122,7 @@ int main()
 		  vector<Particle> particles = pf.getParticles();
 		  int num_particles = particles.size();
 		  double highest_weight = -1.0;
-		  Particle best_particle;
+		  Particle best_particle(0,0,0,0);
 		  double weight_sum = 0.0;
 		  for (int i = 0; i < num_particles; ++i) {
 			if (particles[i].weight > highest_weight) {

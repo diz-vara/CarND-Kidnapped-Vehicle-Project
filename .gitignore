@@ -6,3 +6,5 @@ solution_data
 *.opendb
 *.sdf
 .vs/*
+
+kvp.VC.*

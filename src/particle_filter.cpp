@@ -19,11 +19,37 @@
 
 using namespace std;
 
+Particle::Particle(int _id, double _x, double _y, double _theta) :
+  id(_id+1000),
+  x(_x),
+  y(_y),
+  theta(_theta), 
+  weight(1)
+{
+
+}
+
+
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
+  if (num_particles < 1)
+    std::cerr << "Invalid number of particles (" << num_particles << ")" << std::endl;
+
+
+  //create independent distributions for x, y and theta
+  std::normal_distribution<> d_x(x, std[0]);
+  std::normal_distribution<> d_y(y, std[1]);
+  std::normal_distribution<> d_t(theta, std[2]);
+
+  for (int p = 0; p < num_particles; ++p) {
+    particles.push_back(Particle(p, d_x(gen), d_y(gen), d_t(gen)));
+
+  }
+
 
 }
 
@@ -32,6 +58,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
+
+  //I create three zero-centerd distributions - and will shift them to individual means
+  std::normal_distribution<> d_x(0, std_pos[0]);
+  std::normal_distribution<> d_y(0, std_pos[1]);
+  std::normal_distribution<> d_t(0, std_pos[2]);
+
+  for (Particle p : particles) {
+    if (yaw_rate != 0) {
+      double new_theta = p.theta + yaw_rate * delta_t;
+      p.x = p.x + velocity / yaw_rate * (sin(new_theta) - sin(p.theta)) + d_x(gen);
+      p.y = p.y + velocity / yaw_rate * (cos(p.theta) - cos(new_theta)) + d_y(gen);
+      p.theta = new_theta + d_t(gen);
+    }
+    else {
+      p.x = p.x + velocity * cos(p.theta) * delta_t + d_x(gen);
+      p.y = p.y + velocity * sin(p.theta) * delta_t + d_y(gen);
+      p.theta = p.weight + d_t(gen);
+    }
+  }
 
 }
 

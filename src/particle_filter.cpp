@@ -116,7 +116,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		double cos_t(cos(p.theta));
 		double sin_t(sin(p.theta));
 		// go through all observations
-		p.weight = 0;
+		p.weight = 1;
+    bool bObserved(false);
 		for (LandmarkObs obs : observations) {
 			//transfor from vehicle to Map coordinates
 			double x = obs.x * cos_t - obs.y * sin_t + p.x + d_x(gen); //todo: noise
@@ -132,15 +133,17 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				}
 			}
 			if (idx >= 0) {
+        bObserved = true;
 				p.associations.push_back(idx);
 				p.sense_x.push_back(x);
 				p.sense_y.push_back(y);
-				if (p.weight == 0) p.weight = 1; //initialize on first valid measurement
-				p.weight *= exp(-1. * ((x - best_landmark.x_f)*(x - best_landmark.x_f) / (2 * s_x * s_x)) + ((y - best_landmark.y_f)*(y - best_landmark.y_f) / (2.* s_y * s_y))) / (2 * PI * s_x * s_y);
-				//exp(-1 * (sq(x - mx) / (2 * sq(sx)) + sq(y - my) / (2 * sq(sy)))) / (2 * pi*sx*sy)
-
+        double w = exp(-1. * ((x - best_landmark.x_f)*(x - best_landmark.x_f) / (2 * s_x * s_x)) + ((y - best_landmark.y_f)*(y - best_landmark.y_f) / (2.* s_y * s_y))) / (2 * M_PI * s_x * s_y);
+        p.weight *= w;
+        //std::cout << "\tP " << p.id << ", weight " << w << ", resulting weight " << p.weight << std::endl;
 			}
 		}
+    if (!bObserved)
+      p.weight = 0;
 	}
 }
 
@@ -156,6 +159,7 @@ void ParticleFilter::resample() {
 	std::discrete_distribution<unsigned int> d(weights.begin(), weights.end());
 
 	std::vector<Particle> oldParticles = particles;
+  particles.clear();
 	for (int i = 0; i < num_particles; ++i) {
 		particles.push_back(oldParticles[d(gen)]);
 	}

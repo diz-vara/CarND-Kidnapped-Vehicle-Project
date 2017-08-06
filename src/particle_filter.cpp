@@ -86,6 +86,13 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
+	for (LandmarkObs obs : observations) {
+		double min_dist = 1e9; //large enough value
+		for (LandmarkObs prd : predicted) {
+
+		}
+	}
+
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -100,6 +107,41 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+	double s_x = std_landmark[0];   //sigma x
+	double s_y = std_landmark[1];	//sigma y
+	std::normal_distribution<> d_x(0, s_x);
+	std::normal_distribution<> d_y(0, s_y);
+
+	for (Particle p : particles) {
+		double cos_t(cos(p.theta));
+		double sin_t(sin(p.theta));
+		// go through all observations
+		p.weight = 0;
+		for (LandmarkObs obs : observations) {
+			//transfor from vehicle to Map coordinates
+			double x = obs.x * cos_t - obs.y * sin_t + p.x + d_x(gen); //todo: noise
+			double y = obs.x * sin_t * -1  + obs.y * cos_t + p.y + d_y(gen);
+			double min_dist(sensor_range), cur_dist;
+			int idx(-1);
+			Map::single_landmark_s best_landmark;
+			for (Map::single_landmark_s lmk : map_landmarks.landmark_list) {
+				if ((cur_dist = dist(x, y, lmk.x_f, lmk.y_f)) < min_dist) {
+					min_dist = cur_dist;
+					idx = lmk.id_i;
+					best_landmark = lmk;
+				}
+			}
+			if (idx >= 0) {
+				p.associations.push_back(idx);
+				p.sense_x.push_back(x);
+				p.sense_y.push_back(y);
+				if (p.weight == 0) p.weight = 1; //initialize on first valid measurement
+				p.weight *= exp(-1. * ((x - best_landmark.x_f)*(x - best_landmark.x_f) / (2 * s_x * s_x)) + ((y - best_landmark.y_f)*(y - best_landmark.y_f) / (2.* s_y * s_y))) / (2 * PI * s_x * s_y);
+				//exp(-1 * (sq(x - mx) / (2 * sq(sx)) + sq(y - my) / (2 * sq(sy)))) / (2 * pi*sx*sy)
+
+			}
+		}
+	}
 }
 
 void ParticleFilter::resample() {
@@ -107,6 +149,16 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
+	std::vector<double> weights;
+	for (Particle p : particles) {
+		weights.push_back(p.weight);
+	}
+	std::discrete_distribution<unsigned int> d(weights.begin(), weights.end());
+
+	std::vector<Particle> oldParticles = particles;
+	for (int i = 0; i < num_particles; ++i) {
+		particles.push_back(oldParticles[d(gen)]);
+	}
 }
 
 Particle ParticleFilter::SetAssociations(Particle particle, std::vector<int> associations, std::vector<double> sense_x, std::vector<double> sense_y)

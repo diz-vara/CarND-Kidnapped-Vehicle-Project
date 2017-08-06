@@ -43,8 +43,13 @@ int main(int argc, const char** argv)
 	  return -1;
   }
 
+  int numParticles = 10;
   //TODO: read command line and extract number of particles
-  int numParticles = 50;
+  if (argc > 1) {
+    int n = atoi(argv[1]);
+    if (n > 0 && n < 100000)
+      numParticles = n;
+  }
 
 
   // Create particle filter
@@ -125,11 +130,11 @@ int main(int argc, const char** argv)
 		  Particle best_particle(0,0,0,0);
 		  double weight_sum = 0.0;
 		  for (int i = 0; i < num_particles; ++i) {
-			if (particles[i].weight > highest_weight) {
-				highest_weight = particles[i].weight;
-				best_particle = particles[i];
-			}
-			weight_sum += particles[i].weight;
+        if (particles[i].weight > highest_weight) {
+				  highest_weight = particles[i].weight;
+          best_particle = particles[i];
+  			}
+	  		weight_sum += particles[i].weight;
 		  }
 		  cout << "highest w " << highest_weight << endl;
 		  cout << "average w " << weight_sum/num_particles << endl;

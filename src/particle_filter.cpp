@@ -19,16 +19,16 @@
 
 using namespace std;
 
-Particle::Particle(int _id, double _x, double _y, double _theta) :
-  id(_id+1000),
+
+Particle::Particle(int _id, double _x, double _y, double _theta, double _weight) :
+  id(_id),
   x(_x),
   y(_y),
   theta(_theta), 
-  weight(1)
+  weight(_weight)
 {
 
 }
-
 
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
@@ -44,11 +44,11 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   std::normal_distribution<> d_x(x, std[0]);
   std::normal_distribution<> d_y(y, std[1]);
   std::normal_distribution<> d_t(theta, std[2]);
-
-  for (int p = 0; p < num_particles; ++p) {
-    particles.push_back(Particle(p, d_x(gen), d_y(gen), d_t(gen)));
-
+  for (int i = 0; i < num_particles; ++i) {
+    particles.push_back(Particle(i+1,d_x(gen), d_y(gen), d_t(gen)));
+    weights.push_back(1.);
   }
+  is_initialized = true;
 
 
 }
@@ -64,7 +64,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   std::normal_distribution<> d_y(0, std_pos[1]);
   std::normal_distribution<> d_t(0, std_pos[2]);
 
-  for (Particle p : particles) {
+  for (Particle &p: particles) {
     if (yaw_rate != 0) {
       double new_theta = p.theta + yaw_rate * delta_t;
       p.x = p.x + velocity / yaw_rate * (sin(new_theta) - sin(p.theta)) + d_x(gen);
@@ -74,7 +74,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     else {
       p.x = p.x + velocity * cos(p.theta) * delta_t + d_x(gen);
       p.y = p.y + velocity * sin(p.theta) * delta_t + d_y(gen);
-      p.theta = p.weight + d_t(gen);
+      p.theta = p.theta + d_t(gen);
     }
   }
 
@@ -112,39 +112,51 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	std::normal_distribution<> d_x(0, s_x);
 	std::normal_distribution<> d_y(0, s_y);
 
-	for (Particle p : particles) {
-		double cos_t(cos(p.theta));
+  int i(0);
+  for ( Particle &p: particles) {
+    p.associations.clear();
+    p.sense_x.clear();
+    p.sense_y.clear();
+    double weight = 1;
+    double cos_t(cos(p.theta));
 		double sin_t(sin(p.theta));
 		// go through all observations
-		p.weight = 1;
     bool bObserved(false);
-		for (LandmarkObs obs : observations) {
+
+    for (LandmarkObs obs : observations) {
 			//transfor from vehicle to Map coordinates
 			double x = obs.x * cos_t - obs.y * sin_t + p.x + d_x(gen); //todo: noise
-			double y = obs.x * sin_t * -1  + obs.y * cos_t + p.y + d_y(gen);
+			double y = obs.x * sin_t + obs.y * cos_t + p.y + d_y(gen);
 			double min_dist(sensor_range), cur_dist;
 			int idx(-1);
 			Map::single_landmark_s best_landmark;
 			for (Map::single_landmark_s lmk : map_landmarks.landmark_list) {
-				if ((cur_dist = dist(x, y, lmk.x_f, lmk.y_f)) < min_dist) {
+        cur_dist = dist(x, y, lmk.x_f, lmk.y_f);
+				if (cur_dist < min_dist) {
 					min_dist = cur_dist;
 					idx = lmk.id_i;
 					best_landmark = lmk;
 				}
 			}
-			if (idx >= 0) {
+			if (idx >= 0 ) {
         bObserved = true;
 				p.associations.push_back(idx);
 				p.sense_x.push_back(x);
 				p.sense_y.push_back(y);
-        double w = exp(-1. * ((x - best_landmark.x_f)*(x - best_landmark.x_f) / (2 * s_x * s_x)) + ((y - best_landmark.y_f)*(y - best_landmark.y_f) / (2.* s_y * s_y))) / (2 * M_PI * s_x * s_y);
-        p.weight *= w;
-        //std::cout << "\tP " << p.id << ", weight " << w << ", resulting weight " << p.weight << std::endl;
+        double s1 = (x - best_landmark.x_f)*(x - best_landmark.x_f) / (2. * s_x * s_x);
+        double s2 = (y - best_landmark.y_f)*(y - best_landmark.y_f) / (2. * s_y * s_y);
+        double pow = -1. * (s1 + s2);
+        double e = exp(pow);
+        double w = e / (2. * M_PI * s_x * s_y);
+        weight *= w;
 			}
 		}
+
     if (!bObserved)
-      p.weight = 0;
-	}
+      weight = 0;
+    weights[i++] = weight;
+    p.weight = weight;
+  }
 }
 
 void ParticleFilter::resample() {
@@ -152,17 +164,12 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
-	std::vector<double> weights;
-	for (Particle p : particles) {
-		weights.push_back(p.weight);
-	}
 	std::discrete_distribution<unsigned int> d(weights.begin(), weights.end());
 
-	std::vector<Particle> oldParticles = particles;
-  particles.clear();
+	std::vector<Particle> oldParticles(particles);
 	for (int i = 0; i < num_particles; ++i) {
-		particles.push_back(oldParticles[d(gen)]);
-	}
+		particles[i] = oldParticles[d(gen)];
+  }
 }
 
 Particle ParticleFilter::SetAssociations(Particle particle, std::vector<int> associations, std::vector<double> sense_x, std::vector<double> sense_y)

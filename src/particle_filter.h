@@ -15,7 +15,7 @@ class Particle
 {
 
 public:
-  Particle(int _id, double _x, double _y, double _theta);
+  Particle(int _id, double _x, double _y, double _theta, double weight = 1.);
 
 
 	int id;

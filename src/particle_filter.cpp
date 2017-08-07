@@ -3,6 +3,8 @@
  *
  *  Created on: Dec 12, 2016
  *      Author: Tiffany Huang
+ *
+ *  Solution: Aug 6, 2017 - Anton Varfolomeev
  */
 
 #include <random>
@@ -80,19 +82,13 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 }
 
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
-	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
-	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
-	//   implement this method and use it as a helper during the updateWeights phase.
-
-	for (LandmarkObs obs : observations) {
-		double min_dist = 1e9; //large enough value
-		for (LandmarkObs prd : predicted) {
-
-		}
-	}
-
+// 2-d normal distribution probability
+double ParticleFilter::Mv_NormP(double x, double y, double xm, double ym, double s_x, double s_y) {
+  double s1 = (x - xm)*(x - xm) / (2. * s_x * s_x);
+  double s2 = (y - ym)*(y - ym) / (2. * s_y * s_y);
+  double e = exp(-1. * (s1 + s2));
+  double w = e / (2. * M_PI * s_x * s_y);
+  return w;
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -114,18 +110,17 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
   int i(0);
   for ( Particle &p: particles) {
-    p.associations.clear();
-    p.sense_x.clear();
-    p.sense_y.clear();
+    
+    std::vector<int> associations;
+    std::vector<double> sense_x;
+    std::vector<double> sense_y;
     double weight = 1;
     double cos_t(cos(p.theta));
 		double sin_t(sin(p.theta));
-		// go through all observations
-    bool bObserved(false);
 
     for (LandmarkObs obs : observations) {
-			//transfor from vehicle to Map coordinates
-			double x = obs.x * cos_t - obs.y * sin_t + p.x + d_x(gen); //todo: noise
+			//translate from vehicle to Map coordinates
+			double x = obs.x * cos_t - obs.y * sin_t + p.x + d_x(gen); 
 			double y = obs.x * sin_t + obs.y * cos_t + p.y + d_y(gen);
 			double min_dist(sensor_range), cur_dist;
 			int idx(-1);
@@ -139,22 +134,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				}
 			}
 			if (idx >= 0 ) {
-        bObserved = true;
-				p.associations.push_back(idx);
-				p.sense_x.push_back(x);
-				p.sense_y.push_back(y);
-        double s1 = (x - best_landmark.x_f)*(x - best_landmark.x_f) / (2. * s_x * s_x);
-        double s2 = (y - best_landmark.y_f)*(y - best_landmark.y_f) / (2. * s_y * s_y);
-        double pow = -1. * (s1 + s2);
-        double e = exp(pow);
-        double w = e / (2. * M_PI * s_x * s_y);
-        weight *= w;
+				associations.push_back(idx);
+				sense_x.push_back(x);
+				sense_y.push_back(y);
+        weight *= Mv_NormP(x, y, best_landmark.x_f, best_landmark.y_f, s_x, s_y);
 			}
 		}
 
-    if (!bObserved)
+    //no valid associations!!!
+    if (associations.empty())
       weight = 0;
+
     weights[i++] = weight;
+    p = SetAssociations(p, associations, sense_x, sense_y);
     p.weight = weight;
   }
 }

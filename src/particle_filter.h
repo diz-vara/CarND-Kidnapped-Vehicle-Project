@@ -49,6 +49,8 @@ class ParticleFilter {
   std::random_device rd;
   std::mt19937 gen; 
 
+  // 2-d normal distribution probability
+  double Mv_NormP(double x, double y, double xm, double ym, double s_x, double s_y);
 
 public:
   const std::vector<Particle> getParticles() const { return particles;  }
